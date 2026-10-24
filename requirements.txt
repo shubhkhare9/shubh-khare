@@ -1,0 +1,5 @@
+numpy>=1.26
+pandas>=2.2
+# optional
+scikit-learn>=1.4   # only for --iforest
+pytest>=8           # only for the tests

@@ -1,0 +1,11 @@
+# The data pack belongs to Aeron and must never be committed
+ridgeline_data_pack*/
+pack_raw/
+data/
+gps/
+stations.csv
+maintenance_log.md
+*.zip
+__pycache__/
+.pytest_cache/
+iforest_candidates.csv
