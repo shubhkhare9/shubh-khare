@@ -1,0 +1,245 @@
+Recommended features, best model, and complete pipeline for Aeron
+For this assignment, I recommend an explainable hybrid anomaly-detection system that combines rule-based checks, time-series analysis and an optional Isolation Forest model.
+
+The important distinction is that Aeron is not asking you to predict tomorrow's weather. It wants you to identify unreliable weather records, explain the evidence, and recommend appropriate action.
+
+The solution should therefore be designed around the flags.csv output and the coordinator's decisions—not around maximizing a machine-learning accuracy score.
+1. Which features should you select?
+I would divide the features into four groups. Use all seven weather measurements, the timestamps, station metadata and the information extracted from the GPS files.
+A. Original weather features
+These are the main measurements already present in the CSV files.
+Feature	Why it matters
+temp_c	Detect impossible temperatures and sudden spikes.
+rh_pct	Detect values outside 0–100% and potentially stuck humidity sensors.
+pressure_hpa	Find abrupt pressure shifts and sustained level changes.
+wind_kmh	Detect negative values, spikes and unusually long periods of constant readings.
+wind_dir_deg	Detect invalid directions or abrupt directional changes.
+rain_mm	Find negative values and suspicious rainfall patterns.
+ghi_wm2	Check sunlight readings against daylight and solar position.
+
+My recommendation: retain all seven initially. There is no reason to remove a measurement before investigating whether it carries evidence of a different type of fault.
+B. Time-based features
+The timestamp is as important as the weather values themselves.
+Derived feature	Purpose
+interval_minutes	Detect readings that do not follow the expected 10-minute interval.
+duplicate_timestamp	Identify repeated records.
+missing_interval	Find gaps in the series.
+time_order_error	Detect records that are out of chronological order.
+hour_sin, hour_cos	Represent daily cycles without treating midnight and 23:50 as far apart.
+day_of_year	Account for seasonal changes.
+solar_elevation	Estimate whether sunlight is plausible for the time and location.
+
+For example, a high sunlight reading can be perfectly reasonable during the day but suspicious at a time when the sun is below the horizon.
+C. Time-series features
+These are calculated from the original measurements and are especially useful for detecting sensor faults.
+Engineered feature	Simple explanation
+delta_10m	Difference between the current reading and the previous reading.
+rolling_median_1h	Typical value over the previous hour.
+rolling_MAD_1h	Typical variation over the previous hour, using a robust measure.
+robust_z_score	How unusual the reading is compared with its recent history.
+flatline_duration	How long a measurement has remained almost unchanged.
+step_change	Whether the measurement suddenly shifts to a new level.
+rolling_range	Difference between the maximum and minimum values in a recent window.
+
+For continuous measurements, a useful robust score is:
+\[
+z_{\mathrm{robust}} =
+\frac{x_t-\operatorname{median}(W)}
+{1.4826\,\operatorname{MAD}(W)}
+\]
+
+Here, \(x_t\) is the current reading and \(W\) is a recent time window.
+
+This helps identify readings that are unusual compared with local conditions. However, the threshold must be selected and tested carefully; an unusual weather event is not automatically a sensor fault.
+
+For wind direction, don't use an ordinary subtraction alone. Directions wrap around: 359° and 1° differ by only 2°, not 358°. Encode the direction with sine and cosine when using a statistical model.
+D. GPS and station metadata features
+These can help detect problems that the weather readings alone cannot reveal.
+Feature	Purpose
+gps_lat, gps_lon	Extract the station's location from valid GPS messages.
+gps_distance_from_registered_m	Compare GPS coordinates with stations.csv.
+gps_clock_offset_seconds	Compare logger timestamps against GPS time.
+gps_fix_quality	Identify invalid or unreliable GPS fixes.
+gps_satellites, gps_hdop	Assess the quality of the available GPS information, when present.
+elevation_m	Provide context for temperature and station pressure.
+logger_interval_min	Establish the expected logging frequency.
+maintenance_event	Determine whether an anomaly coincides with a repair or equipment change.
+
+One feature deserves special attention: the time difference between the logger and GPS clock. This can identify time problems even when the weather measurements appear reasonable.
+
+You should extract these GPS features from the NMEA sentences, rather than feeding the raw GPS text directly into a conventional anomaly-detection model.
+2. What is the best model for this assignment?
+Recommended approach
+Hybrid Quality Checker
+Rules + robust statistics + optional unsupervised anomaly scoring
+
+
+Layer 1: Rule-based validation
+
+Find hard errors such as humidity above 100%, negative wind speed, invalid timestamps and impossible data values.
+
+
+
+Layer 2: Robust time-series detection
+
+Use rolling median/MAD, sudden-change checks, flatline detection and change-point analysis to identify suspicious patterns.
+
+
+
+Layer 3: Isolation Forest (optional)
+
+Rank unusual combinations of engineered features for further investigation. Treat its output as supporting evidence, not proof that a reading is wrong.
+
+
+
+Why not use Random Forest, XGBoost or an LSTM as the main model?
+The supplied data has weather measurements but no verified column saying which rows are faulty and which are correct. That means you do not have the labelled examples required to train a conventional supervised fault classifier.
+
+Also, the problem requires evidence for each flag, not just a model prediction.
+Approach	My recommendation	Reason
+Rule-based checks	Essential	Explainable and suitable for known errors.
+Rolling median + MAD	Essential	Good for sudden anomalies and local deviations.
+Isolation Forest	Optional	Can identify unusual patterns that your rules miss.
+Random Forest / XGBoost	Not as the primary model	No verified fault labels for supervised training.
+LSTM / CNN	Not necessary here	Adds complexity without solving the core evidence and decision problem.
+
+The best choice is the hybrid checker, not a single machine-learning model. Isolation Forest can strengthen it, but your solution should still work when that model is disabled.
+
+If you implement Isolation Forest, build features from each station's time series and account for differences between stations. Do not blindly pool raw pressure values across all locations: station pressure naturally depends on elevation. Likewise, train on engineered measurements and residuals rather than only the raw columns.
+3. Complete end-to-end pipeline
+This is how I would structure the implementation for Aeron.
+1. Input data
+
+8 weather CSVs · 8 NMEA files · station metadata · maintenance log
+
+2. Load and validate
+
+Check schema, units, missing values, duplicates, timestamp ordering and expected intervals.
+
+3. Build features
+
+Time differences, rolling statistics, flatlines, GPS clock offsets, coordinate distances and solar position.
+
+4. Detect candidate problems
+
+Physical rules + robust time-series checks + optional Isolation Forest scoring.
+
+5. Verify the evidence
+
+Compare neighbouring readings, station history, GPS evidence, metadata and maintenance events.
+
+6. Assign an action
+
+Exclude, correct or keep. Preserve uncertainty rather than inventing a correction.
+
+7. Produce the deliverables
+
+flags.csv + network health report + evidence for the technician's visit
+
+
+What each stage should do
+Stage 1 — Data ingestion: Read the pack directory supplied as a command-line argument. Load every station rather than hard-coding the eight filenames, so the checker also works on another pack in the same format.
+
+Stage 2 — Data integrity: Parse timestamps, sort chronologically before calculating changes, and identify duplicate timestamps, missing intervals and conflicting records. Never silently drop a questionable record without recording the decision.
+
+Stage 3 — Feature engineering: Calculate the temporal and GPS features described above. Use station-specific baselines and preserve the raw readings for evidence.
+
+Stage 4 — Detection: Apply physical validity checks first, then time-series checks. Run the optional Isolation Forest on suitable engineered features to surface additional candidates.
+
+Stage 5 — Evidence verification: Use the maintenance log and station metadata to decide whether the anomaly plausibly indicates a fault. Comparing other stations can help, but differences alone are not proof of a fault.
+
+Stage 6 — Decision and output: Combine related suspicious readings into time ranges and produce one row for each problem. The note should explain why the flag exists and how any correction was determined.
+
+Stage 7 — Testing: Test edge cases, verify the known examples in this pack, and ensure your code works on an unseen data pack with the same format.
+4. How the pipeline applies to your actual data
+Your ZIP already contains some useful examples that demonstrate why the hybrid approach is appropriate.
+Example 1 · Temperature anomaly
+
+S03 — Valley Library
+
+On 12 March, the temperature jumps to 85°C, surrounded by readings around 7°C and 6°C. This is strong evidence of a suspicious isolated measurement.
+
+Features used: temp_c, delta_10m, rolling median and robust z-score.
+
+Detection: Physical-range rule plus sudden-spike detection.
+
+
+Example 2 · Pressure level shift
+
+S02 — North Mesa School
+
+On 21 March, pressure rises from around 836.0 to 842.5 hPa. The maintenance log says the pressure board was replaced that day without calibration.
+
+Features used: pressure_hpa, step_change, rolling median and maintenance-event timing.
+
+Detection: Change-point analysis plus contextual evidence. Do not automatically correct the pressure values without a known calibration relationship.
+
+
+Example 3 · Location mismatch
+
+S05 — Eastside Rec Centre
+
+The GPS coordinates are approximately 20 km away from the registered station coordinates.
+
+Features used: GPS latitude, longitude and distance from the registered location.
+
+Detection: GPS-to-metadata consistency check.
+
+
+Example 4 · Clock inconsistency
+
+S06 — South Hills Fire Station
+
+Some GPS timestamps differ from the logger timestamps by approximately six hours. The maintenance log records a battery replacement and logger reboot.
+
+Features used: gps_clock_offset_seconds, duplicate timestamps and missing intervals.
+
+Detection: Compare the logger clock against the parsed GPS time and verify when the discrepancy starts and ends.
+
+
+These are investigation examples from your pack, not a finalized list of flags. Your checker should establish the exact affected time ranges and decide the appropriate action from the evidence.
+5. What should your code repository look like?
+I recommend keeping the implementation modular but simple enough to finish within the assignment's deadline.
+shubh-khare/
+├── checker.py
+├── src/
+│   ├── data_loader.py
+│   ├── weather_checks.py
+│   ├── time_series_checks.py
+│   ├── gps_checks.py
+│   ├── maintenance_checks.py
+│   └── flag_builder.py
+├── tests/
+│   └── test_checker.py
+├── flags.csv
+├── report.html
+├── DECISIONS.md
+├── README.md
+└── ai_logs/
+
+
+The responsibilities are straightforward:
+- data_loader.py: load weather files, station details and GPS messages.
+- weather_checks.py: enforce physical and measurement constraints.
+- time_series_checks.py: find spikes, flatlines and abrupt shifts.
+- gps_checks.py: check coordinates and clock offsets.
+- maintenance_checks.py: connect anomalies to maintenance events.
+- flag_builder.py: combine evidence and generate the required output.
+- checker.py: run everything from one command.
+For example:
+python checker.py ./ridgeline_data_pack
+
+
+After extracting the supplied ZIP into that folder, this command should run the complete pipeline and create flags.csv in the directory from which you execute it.
+6. How will you know whether your solution is good?
+Do not measure success only by the number of anomalies detected. Measure whether the checker detects genuine problems without discarding valid weather observations.
+
+Your testing should cover:
+Test	What success looks like
+Impossible readings	Clearly invalid values are flagged.
+Sudden spikes	Isolated anomalies are detected with surrounding evidence.
+Sensor drift or step changes	Sustained shifts are identified without flagging every row separately.
+Missing and duplicate timestamps	Timing defects are recorded accurately.
+GPS mismatch	Differences from registered station metadata are detected.
+Genuine weather variation	Plausible unusual events are not automatically discarded.
+New data pack	The checker runs without depending on hard-coded dates or station-specific fixes.

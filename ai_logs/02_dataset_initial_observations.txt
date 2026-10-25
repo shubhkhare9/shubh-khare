@@ -1,0 +1,285 @@
+Initial observations from your actual data pack
+I've opened the ZIP file and checked its structure. It contains the eight station CSV files, GPS/NMEA files, station metadata and the volunteer maintenance log.
+
+A few things stand out already. These are initial leads to investigate, not final decisions.
+
+S03 — Valley Library
+High-priority investigation
+Temperature readings include −40°C and 85°C on four occasions. Some coincide with sunlight conditions that make them particularly suspicious. We should inspect the exact timestamps and surrounding readings.
+
+
+
+
+S05 — Eastside Rec Centre
+Sensor investigation
+Humidity reaches 105%, and the maintenance notes mention a humidity reading stuck at 100% for a week. This needs investigation before deciding which time range, if any, to exclude.
+
+
+
+
+S02 — North Mesa School
+
+The pressure sensor board was replaced on 21 March without calibration. We should check whether the pressure series changes around that time and whether GPS or other evidence supports a timing issue.
+
+
+
+
+S06 and S08
+
+Their files have timestamp irregularities. S06's data ends earlier than the other stations, while S08 has duplicate timestamps and a maintenance note about a website outage. We need to distinguish logging problems from website display problems.
+
+
+
+
+S04 — Foothills Community Garden
+
+The radiation shield's post was painted white, and the rain gauge was later found clogged with leaves and a bird nest. These events may affect different measurements during different periods.
+
+
+
+The maintenance log also mentions a replacement anemometer at S07 and a battery replacement and reboot at S06. Those are additional clues worth checking.
+7. What I suggest we do next
+Let's work through the assignment in the correct order:
+1. Dataset audit: inspect all eight stations, GPS timestamps and coordinates, maintenance events and suspicious readings.
+2. Evidence-based decisions: determine the affected channels and time ranges, and whether to exclude, correct or keep each issue.
+3. Build and test the checker: create reusable Python code that generates flags.csv.
+4. Prepare the final deliverables: the report, your own DECISIONS.md, README, AI logs and demonstration plan.
+One important point: we should not automatically mark every unusual reading as faulty. The assignment is specifically testing whether you can distinguish real weather events from sensor or logging errors.
+
+My recommendation is to start with the complete dataset audit. That will give us the evidence needed to build a defensible solution instead of guessing at thresholds or choosing a technician's visit too early.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+About dataset in easy language
+
+
+
+
+
+
+
+
+
+
+
+
+Worked for 21s
+
+
+
+
+
+
+
+Understanding your dataset in easy language
+Your dataset is called the Ridgeline Schools Weather Network: 6-week data pack.
+
+Think of it as a collection of records from eight weather stations. Each station measures the weather, records the readings on its computer (called a logger), and stores information about its GPS receiver.
+
+The main purpose of studying this dataset is to find out which readings can be trusted and which may be affected by faulty equipment, incorrect timestamps or data-collection problems.
+1. What files did Aeron give you?
+Your ZIP file contains 21 files organized into three main groups.
+
+data/ — Weather readings
+
+Contains 8 CSV files, one for each station: S01.csv to S08.csv.
+
+Each file contains temperature, humidity, pressure, wind, rainfall and sunlight measurements.
+
+
+
+
+gps/ — GPS information
+
+Contains 8 NMEA files, one for each station. These hold raw GPS messages that can help us check the station's location and whether its clock is correct.
+
+
+
+
+stations.csv and maintenance_log.md
+
+stations.csv tells us where the stations are located, their elevation and when they were installed.
+
+maintenance_log.md contains volunteers' notes about equipment problems and repairs.
+
+
+
+The ZIP also includes a README.md explaining the files and their measurement units.
+2. What does each weather column mean?
+Let's understand the columns inside a station's CSV file.
+Column	Easy meaning	Example
+timestamp_utc	Date and time of the reading	2025-03-01 00:10
+temp_c	Air temperature in Celsius	2.4 means 2.4°C
+rh_pct	Relative humidity percentage	36 means 36% humidity
+pressure_hpa	Air pressure in hectopascals	717.8 hPa
+wind_kmh	Average wind speed in km/h	4.4 km/h
+wind_dir_deg	Direction the wind comes from, in degrees	90° means approximately east
+rain_mm	Rainfall recorded during that interval	0.2 mm
+ghi_wm2	Sunlight energy reaching a horizontal surface	188 W/m²
+
+How frequently is the data collected?
+Every 10 minutes.
+
+For example, a station might record readings at 10:00, 10:10, 10:20 and 10:30 UTC.
+
+The dataset covers 42 days, from 1 March to 11 April 2025. Each complete station file contains 6,048 rows, which is 42 days × 24 hours × 6 readings per hour.
+3. What are the eight stations?
+
+
+
+
+
+
+
+
+
+S01 — Saddle Ridge Hut
+
+A high-elevation station at 2,913 metres.
+
+
+
+
+
+
+
+
+
+
+
+S02 — North Mesa School
+
+School station; pressure-board replacement is mentioned in the maintenance log.
+
+
+
+
+
+
+
+
+
+
+
+S03 — Valley Library
+
+Library station; a routine check mentions spider webs on the radiation shield.
+
+
+
+
+
+
+
+
+
+
+
+S04 — Foothills Community Garden
+
+Garden station; its maintenance notes mention repainting and a clogged rain gauge.
+
+
+
+
+
+
+
+
+
+
+
+S05 — Eastside Rec Centre
+
+Recreation-centre station; the log questions a humidity reading that remained at 100%.
+
+
+
+
+
+
+
+
+
+
+
+S06 — South Hills Fire Station
+
+Fire-station location; its battery was replaced and the logger rebooted.
+
+
+
+
+
+
+
+
+
+
+
+S07 — Riverbend Farm
+
+Farm station; its anemometer, which measures wind speed, was replaced.
+
+
+
+
+
+
+
+
+
+
+
+S08 — Plains Grange Hall
+
+Community-hall station; the maintenance log mentions website data interruptions and duplicate-day displays.
+
+
+
+These images are illustrative examples of the types of locations, not photographs of the actual eight stations.
+4. Why are the GPS files important?
+The GPS files contain raw messages from a GPS receiver.
+
+A GPS receiver can help establish:
+- Location: Is the station reporting coordinates consistent with its registered location?
+- Time: Does the logger's clock agree with the GPS time?
+- Signal quality: Are the GPS messages valid, or are they missing or unreliable?
+For example, if a station's weather records say 12:00 but its GPS information suggests the clock is several minutes off, you need to investigate before comparing its readings with other stations.
+
+The GPS files are therefore useful evidence, not just extra data to ignore.
+5. Why is the maintenance log important?
+The maintenance log gives you context that numbers alone cannot provide.
+Maintenance note	What you should investigate
+Pressure board replaced at S02	Did pressure readings change around the replacement time?
+Humidity stayed at 100% at S05	Was the sensor stuck, or was the reading plausible?
+Anemometer replaced at S07	Did wind measurements change after replacement?
+Battery replaced at S06	Did the reboot affect timestamps or data continuity?
+Rain gauge cleaned at S04	Did rainfall measurements change after cleaning?
+Website interruption at S08	Is the problem in the logger data or only in website display?
+
+The note is a clue, not proof. You must compare it with the actual readings.
+6. What problems have already appeared in the files?
+A preliminary file check shows:
+- S01, S02, S03, S04, S05 and S07 each have 6,048 rows and no missing cells or duplicate timestamps.
+- S06 has 36 duplicate timestamps and ends earlier than the other stations.
+- S08 has 144 duplicate timestamps.
+This does not mean every reading at S06 or S08 is wrong. It means the timestamp patterns need investigation. We should also check for impossible measurements, unusual changes and other issues across all stations.
+
+One important detail in the supplied README: the weather values are based on ERA5 reanalysis data, a reconstructed estimate of historical weather, while the station names, equipment and maintenance notes are fictional. This matters because we should not assume that every recorded value came directly from a physical sensor.
+7. The whole dataset in one sentence
+You have eight stations × six weeks of weather readings, supported by GPS messages, station details and maintenance notes, and your job is to use this evidence to determine which data is reliable enough to use and where further investigation is needed.

@@ -1,0 +1,194 @@
+Aeron Systems AI Research Engineer Intern Assignment — Explained Simply
+I read your assignment PDF. In simple words, Aeron wants you to inspect weather-station data, identify suspicious or faulty readings, and recommend what should be fixed or investigated.
+
+This is not just a coding task. They want to see how you use Python and AI tools, how you investigate real-world data, and whether you can explain and defend your decisions.
+Deadline: 48 hours
+
+Expected effort: approximately 10–12 hours.
+
+
+
+Data provided
+
+8 weather stations, 6 weeks of observations, and maintenance notes.
+
+
+
+What you submit
+
+A Python checker, a one-page report, a decisions document, GitHub repository, AI chat logs, and a 3-minute recording.
+
+
+
+1. What problem are you solving?
+Imagine that eight schools and community centres have weather stations. Every 10 minutes, these stations record:
+- Temperature
+- Humidity
+- Air pressure
+- Wind
+- Rainfall
+- Sunlight
+- GPS information
+Volunteers also write notes about maintenance or problems with the equipment.
+
+However, nobody has checked whether the data is reliable.
+
+For example:
+- A station reports a temperature of 25°C, then suddenly 95°C.
+- A humidity sensor reports 150%, which is suspicious.
+- A station records zero rainfall for weeks, possibly because its sensor is faulty.
+- GPS coordinates jump to a completely different location.
+- A strange temperature reading coincides with a maintenance note mentioning a sensor replacement.
+Your job is to investigate these situations rather than blindly assume that every unusual reading is wrong.
+
+The coordinator needs answers to two questions:
+1. Which data can safely be used for the spring climate report?
+2. Which station should the technician visit next week?
+These two decisions are the main purpose of your assignment. Aeron-AI-Research-Engineer-Intern-AssignmentNew.pdf
+
+2. What exactly do you have to build?
+There are three main deliverables, plus the submission requirements.
+
+Deliverable 1: A Python data checker
+Most technical part
+You must write a program that reads the supplied weather data and detects problems automatically.
+
+Examples of checks you could implement:
+- Missing values and duplicate timestamps.
+- Impossible readings, such as humidity above 100%.
+- Sudden spikes or suspiciously constant readings.
+- Incorrect or inconsistent GPS coordinates.
+- Sensor problems supported by maintenance notes.
+Your program must produce a file named flags.csv, with one row for each identified problem.
+
+Each row must include:
+Column	Meaning
+station_id	Which station has the issue, e.g. S03
+channel	Which measurement is affected
+start_utc, end_utc	When the issue occurred
+issue	Short description of the problem
+action	What should happen
+note	Evidence supporting your decision
+
+There are three possible actions:
+exclude
+Remove unreliable readings from the climate summary.
+
+correct
+Correct a value only when you have enough evidence to determine the correct value or correction method.
+
+keep
+The reading looks unusual but appears genuine, so retain it.
+
+
+Important: You cannot simply write code that works for these eight stations. Aeron will also test it on another data pack with the same format. Your checker must be reusable and run with one command.
+
+
+
+
+Deliverable 2: A one-page network health report
+This is a short report for the retired-teacher coordinator, who is not a technical person.
+
+It should explain:
+- Which stations and data are trustworthy.
+- Which stations or measurements have serious problems.
+- What data should be excluded, corrected or retained.
+- Which station the technician should visit and why.
+Use simple language, clear charts or tables where useful, and an attractive printable layout in report.html or report.pdf. The report must be no longer than two pages.
+
+Think of this as the final summary that helps someone make a decision without reading your Python code.
+
+
+
+
+Deliverable 3: DECISIONS.md
+Must be in your own words
+This document has five questions, and it must be at most 1.5 pages long.
+
+1. The technician's visit
+
+Choose one station for a one-hour visit. Explain exactly what the technician should do, what they should inspect first, and why you chose this station over the second-best option.
+
+2. Your least certain decision
+
+Select the flag you are least confident about. Explain the evidence for and against your decision, and what additional information would resolve the uncertainty.
+
+3. Where AI was wrong
+
+Describe one or two occasions when ChatGPT or another AI tool gave you a plausible but incorrect answer, code snippet or threshold. Explain how you caught the error.
+
+4. What changes at 500 stations?
+
+Explain how you would adapt the checker to process 500 stations automatically. What would you change, what would you remove, and what decisions should still require human judgement?
+
+5. A calculation without AI or code
+
+Estimate the UTC time when the sun is highest at station S04 on 20 March 2025. Show your calculation in a few lines and explain why that information is useful for checking sunlight measurements.
+
+This last question tests your own understanding, not just your ability to use AI.
+
+
+
+Aeron-AI-Research-Engineer-Intern-AssignmentNew.pdf
+3. How should you approach the assignment?
+I would follow this order so that you don't waste time coding before understanding the data.
+1. Inspect the data pack
+   
+   Open the files, understand their columns, timestamps, units, station IDs and maintenance notes. Check missing values, duplicates and data coverage.
+2. Investigate each station
+   
+   Compare readings over time and look for impossible values, spikes, gaps, sensor drift and suspicious patterns. Cross-check unusual events with maintenance notes and other measurements.
+3. Build the Python checker
+   
+   Convert your checks into reusable functions. Generate flags.csv automatically, with evidence for every flag. Avoid using arbitrary thresholds without justification.
+4. Test your checker
+   
+   Test normal data, faulty data, missing values and edge cases. Check that the program runs from a single command and handles data it was not specifically written for.
+5. Make the report and choose the technician's visit
+   
+   Use your findings to identify the most important problems. Prioritize the station where a one-hour inspection could provide the greatest benefit.
+6. Write your decisions and submit
+   
+   Complete DECISIONS.md, maintain your AI chat logs, record the demonstration and submit the GitHub repository through the form before the deadline.
+4. What should your GitHub repository contain?
+Your repository should be public and named using your first and last name, for example shubh-khare.
+shubh-khare/
+
+checker.py — main detection program
+
+flags.csv — detected problems for the supplied pack
+
+DECISIONS.md — your five decisions
+
+report.html or report.pdf — network health report
+
+README.md — instructions and limitations
+
+ai_logs/ — complete AI chat exports
+
+
+
+The README must start with four lines containing your full name, email, video link and the one command needed to run the checker. You also need a three-minute screen recording with your voice, showing the evidence behind your strongest flag and your least certain flag.
+
+Do not upload the original weather data pack to GitHub or share it before the deadline. The assignment permits free tools and explicitly expects AI use. Commit your progress as you work, rather than uploading everything in one final commit. Aeron-AI-Research-Engineer-Intern-AssignmentNew.pdf
+
+5. What is Aeron really testing?
+Skill	What they want to see
+Python and data handling	Can you build a reliable, reusable checker?
+Data analysis	Can you identify real problems rather than just unusual numbers?
+Research judgement	Can you justify your thresholds and conclusions with evidence?
+AI usage	Can you use AI productively while checking its mistakes?
+Communication	Can you explain technical findings to a non-technical person?
+Engineering maturity	Can you handle uncertainty, testing and future automation?
+
+The assignment explicitly says that being right and knowing why matters more than writing lots of code or adding many features. Aeron-AI-Research-Engineer-Intern-AssignmentNew.pdf
+
+My recommendation for you
+Since you're pursuing an AI Research Engineer role with your Electrical Engineering and MTech AIML background, approach this as a data-quality and sensor-diagnostics project, not as a machine-learning competition.
+
+You do not necessarily need to train a neural network. A well-designed Python checker using statistical analysis, time-series checks, GPS validation and maintenance-note evidence may be more appropriate than a complicated ML model.
+
+The most important thing is to distinguish between:
+- Impossible: a reading violates a physical or measurement constraint.
+- Suspicious: a reading is unusual and needs investigation.
+- Unusual but genuine: a real weather event that should not be discarded
