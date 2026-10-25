@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridgeline network health check</title>
+<style>
+  :root {
+    --ink: #1c2a2b; --muted: #5a6b6c; --rule: #c9d2d0; --paper: #fbfaf6;
+    --ok: #e3efe6; --ok-ink: #1d5b34; --fix: #e1ebf4; --fix-ink: #23527a;
+    --part: #f7ecd2; --part-ink: #7a5300; --bad: #f4dcd2; --bad-ink: #8f2f10;
+    --accent: #1f6f6b;
+  }
+  * { box-sizing: border-box; }
+  html { background: #e8e6df; }
+  body { margin: 0; color: var(--ink); font: 10.2pt/1.42 "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; margin: 8mm auto; padding: 13mm 14mm 11mm; background: var(--paper); position: relative;
+          overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+  @page { size: A4; margin: 0; }
+  @media print { html { background: none; } .page { margin: 0; box-shadow: none; break-after: page; } .page:last-child { break-after: auto; } }
+  @media (max-width: 800px) { .page { width: auto; height: auto; margin: 0; padding: 16px; overflow: visible; box-shadow: none; } }
+
+  h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  h1 { font-size: 21pt; line-height: 1.12; }
+  h2 { font-size: 12.5pt; margin-bottom: 4px; }
+  .kicker { font-size: 8.3pt; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 9.2pt; margin-top: 4px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 10px; }
+
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 11px; }
+  .ans { border-top: 3px solid var(--accent); padding: 6px 0 0; }
+  .ans .q { font-size: 8.3pt; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .ans .a { font-family: Georgia, serif; font-size: 13.2pt; line-height: 1.2; margin: 2px 0 5px; }
+  .ans p { margin: 0 0 4px; font-size: 9.6pt; }
+  .ans ul { margin: 3px 0 0; padding-left: 15px; font-size: 9.4pt; }
+  .ans li { margin-bottom: 2px; }
+  .ans.go { border-top-color: var(--bad-ink); }
+
+  table.grid { width: 100%; border-collapse: collapse; font-size: 8.6pt; table-layout: fixed; }
+  table.grid th { font-weight: 600; text-align: center; padding: 3px 2px; border-bottom: 1.5px solid var(--ink); font-size: 8pt; }
+  table.grid th[scope=row] { text-align: left; font-weight: 400; padding: 0 4px 0 0; border-bottom: 1px solid var(--rule); white-space: nowrap; width: 33%; overflow: hidden; text-overflow: ellipsis; }
+  table.grid th[scope=row] b { font-family: Georgia, serif; }
+  .nm { color: var(--muted); font-size: 7.8pt; }
+  .tag { font-size: 7pt; background: var(--part); color: var(--part-ink); padding: 0 4px; border-radius: 2px; margin-left: 3px; }
+  td.c { text-align: center; border: 2px solid var(--paper); height: 23px; font-weight: 600; }
+  td.ok { background: var(--ok); color: var(--ok-ink); }
+  td.fixed { background: var(--fix); color: var(--fix-ink); }
+  td.part { background: var(--part); color: var(--part-ink); }
+  td.bad { background: var(--bad); color: var(--bad-ink); }
+  td.c .pct { font-size: 7.4pt; font-weight: 500; margin-left: 3px; }
+  .sr { position: absolute; left: -9999px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 8.3pt; color: var(--muted); margin: 6px 0 0; }
+  .legend b { display: inline-block; min-width: 18px; text-align: center; padding: 0 3px; border-radius: 2px; margin-right: 3px; }
+  .legend .ok b { background: var(--ok); color: var(--ok-ink); } .legend .fixed b { background: var(--fix); color: var(--fix-ink); }
+  .legend .part b { background: var(--part); color: var(--part-ink); } .legend .bad b { background: var(--bad); color: var(--bad-ink); }
+
+  .box { border: 1px solid var(--rule); background: #fff; padding: 7px 10px; margin-top: 10px; font-size: 9.4pt; }
+  .box strong { font-family: Georgia, serif; }
+
+  table.what { width: 100%; border-collapse: collapse; font-size: 8.9pt; margin-top: 4px; }
+  table.what th { text-align: left; font-size: 7.8pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 3px 6px 3px 0; font-weight: 600; }
+  table.what td { vertical-align: top; padding: 5px 8px 5px 0; border-bottom: 1px solid var(--rule); }
+  table.what td:first-child { width: 17%; font-family: Georgia, serif; }
+  table.what td:first-child small { display: block; font-family: "Segoe UI", Helvetica, Arial, sans-serif; color: var(--muted); font-size: 7.8pt; }
+  table.what td:nth-child(2) { width: 36%; } table.what td:nth-child(3) { width: 27%; }
+  table.what tr.go td:first-child { border-left: 3px solid var(--bad-ink); padding-left: 6px; }
+  .pill { display: inline-block; font-size: 7.6pt; font-weight: 600; padding: 0 5px; border-radius: 2px; margin-bottom: 2px; }
+  .pill.visit { background: var(--bad); color: var(--bad-ink); } .pill.ask { background: var(--part); color: var(--part-ink); }
+  .pill.none { background: var(--ok); color: var(--ok-ink); } .pill.sheet { background: var(--fix); color: var(--fix-ink); }
+
+  .two { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-top: 10px; align-items: start; }
+  .chart { width: 100%; height: auto; display: block; }
+  .chart .grid { stroke: #dfe5e3; stroke-width: 1; } .chart .grid.zero { stroke: #8b9896; }
+  .chart .ax { font-size: 9px; fill: var(--muted); } .chart .lab { font-size: 10px; fill: var(--muted); }
+  .chart .focus-lab { fill: var(--bad-ink); font-weight: 700; }
+  .chart .other { fill: none; stroke: #a9b5b3; stroke-width: 1; opacity: .75; }
+  .chart .focus { fill: none; stroke: var(--bad-ink); stroke-width: 1.8; } .chart .dot { fill: var(--bad-ink); }
+  .chart .fit { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  figcaption { font-size: 8.4pt; color: var(--muted); margin-top: 2px; }
+  figure { margin: 0; }
+  .why p { margin: 0 0 5px; font-size: 9.2pt; } .why ul { margin: 0; padding-left: 14px; font-size: 9.2pt; } .why li { margin-bottom: 3px; }
+  .unsure { margin-top: 9px; font-size: 9pt; } .unsure ul { margin: 2px 0 0; padding-left: 15px; } .unsure li { margin-bottom: 2px; }
+  footer { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; font-size: 7.8pt; color: var(--muted); display: flex; justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- ============================== PAGE 1 ============================== -->
+<section class="page" aria-label="Page 1">
+  <header>
+    <div class="kicker">Ridgeline Schools Weather Network &middot; health check</div>
+    <h1>Can we trust this spring's weather data, and where should the technician go?</h1>
+    <div class="sub">Eight stations, 1 Mar to 11 Apr 2025, a reading every 10 minutes. Prepared for the network coordinator.</div>
+  </header>
+
+  <div class="answers">
+    <div class="ans">
+      <div class="q">1 &middot; Which data can go in the spring summary?</div>
+      <div class="a">Almost all of it. Two series are not usable after 26 March.</div>
+      <p>Of the 56 station-measurements (8 stations &times; 7 measurements), <b>36 are good exactly as sent</b> and <b>8 are good after I corrected them</b> (S06's clock and S02's pressure).
+         10 have a short hole that I left out, and <b>2 should not be used</b> for the rest of the period:</p>
+      <ul>
+        <li><b>S04 afternoon temperature</b> since 26 Mar</li>
+        <li><b>S07 wind speed</b> since 26 Mar</li>
+      </ul>
+    </div>
+    <div class="ans go">
+      <div class="q">2 &middot; Where should the technician go next week?</div>
+      <div class="a">S04, Foothills Community Garden.</div>
+      <p>Its afternoon temperature has crept up to <b>+4.9&nbsp;&deg;C too warm</b> and is still growing, which would spoil the headline number of a climate summary. Nobody can fix that without being there.</p>
+      <p style="margin:0">One hour: check the temperature shield and the white-painted post, compare with a hand thermometer, and look at the rain gauge cleaned on 2 April.</p>
+    </div>
+  </div>
+
+  <h2>Station by measurement</h2>
+  <table class='grid'><thead><tr><th style='width:31%'></th><th scope='col'>Temp</th><th scope='col'>Humidity</th><th scope='col'>Pressure</th><th scope='col'>Wind speed</th><th scope='col'>Wind dir.</th><th scope='col'>Rain</th><th scope='col'>Sunlight</th></tr></thead><tbody><tr><th scope='row'><b>S01</b> <span class='nm'>Saddle Ridge Hut</span></th><td class='c ok' title='S01 Temp: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Humidity: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Pressure: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Wind speed: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Rain: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S01 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S02</b> <span class='nm'>North Mesa School</span></th><td class='c ok' title='S02 Temp: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S02 Humidity: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c fixed' title='S02 Pressure: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c ok' title='S02 Wind speed: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S02 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S02 Rain: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S02 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S03</b> <span class='nm'>Valley Library</span></th><td class='c part' title='S03 Temp: some left out, 92% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>92%</span></td><td class='c ok' title='S03 Humidity: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S03 Pressure: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S03 Wind speed: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S03 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S03 Rain: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S03 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S04</b> <span class='nm'>Foothills Community Garden</span></th><td class='c bad' title='S04 Temp: left out, 80% of readings usable'><span class='sym' aria-hidden='true'>&#10005;</span><span class='sr'>left out</span><span class='pct'>80%</span></td><td class='c ok' title='S04 Humidity: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S04 Pressure: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S04 Wind speed: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S04 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c part' title='S04 Rain: some left out, 89% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>89%</span></td><td class='c ok' title='S04 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S05</b> <span class='nm'>Eastside Rec Centre</span> <span class='tag'>sheet error</span></th><td class='c ok' title='S05 Temp: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c part' title='S05 Humidity: some left out, 92% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>92%</span></td><td class='c ok' title='S05 Pressure: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S05 Wind speed: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S05 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S05 Rain: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S05 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S06</b> <span class='nm'>South Hills Fire Station</span></th><td class='c fixed' title='S06 Temp: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Humidity: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Pressure: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Wind speed: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Wind dir.: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Rain: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td><td class='c fixed' title='S06 Sunlight: fixed, 100% of readings usable'><span class='sym' aria-hidden='true'>&#8635;</span><span class='sr'>fixed</span></td></tr><tr><th scope='row'><b>S07</b> <span class='nm'>Riverbend Farm</span></th><td class='c ok' title='S07 Temp: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S07 Humidity: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S07 Pressure: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c bad' title='S07 Wind speed: left out, 61% of readings usable'><span class='sym' aria-hidden='true'>&#10005;</span><span class='sr'>left out</span><span class='pct'>61%</span></td><td class='c ok' title='S07 Wind dir.: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S07 Rain: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td><td class='c ok' title='S07 Sunlight: good, 100% of readings usable'><span class='sym' aria-hidden='true'>&#10003;</span><span class='sr'>good</span></td></tr><tr><th scope='row'><b>S08</b> <span class='nm'>Plains Grange Hall</span></th><td class='c part' title='S08 Temp: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Humidity: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Pressure: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Wind speed: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Wind dir.: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Rain: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td><td class='c part' title='S08 Sunlight: some left out, 96% of readings usable'><span class='sym' aria-hidden='true'>&frac12;</span><span class='sr'>some left out</span><span class='pct'>96%</span></td></tr></tbody></table>
+  <div class="legend" aria-label="legend">
+    <span class="ok"><b>&#10003;</b>good as sent</span>
+    <span class="fixed"><b>&#8635;</b>good after correction</span>
+    <span class="part"><b>&frac12;</b>a stretch left out (share still usable)</span>
+    <span class="bad"><b>&#10005;</b>not usable from the fault onwards (share still usable)</span>
+  </div>
+
+  <div class="two">
+    <figure>
+      <h2 style="font-size:10.5pt;margin-bottom:2px">Why S04: the error grows with the sun</h2>
+      <svg viewBox="0 0 660 250" role="img" aria-label="Daily afternoon-minus-night temperature difference from neighbours, S04 against the other stations" class="chart">
+<line x1="38" x2="598" y1="224.0" y2="224.0" class="grid"/>
+<text x="32" y="227.0" class="ax" text-anchor="end">-12</text>
+<line x1="38" x2="598" y1="190.5" y2="190.5" class="grid"/>
+<text x="32" y="193.5" class="ax" text-anchor="end">-9</text>
+<line x1="38" x2="598" y1="157.1" y2="157.1" class="grid"/>
+<text x="32" y="160.1" class="ax" text-anchor="end">-6</text>
+<line x1="38" x2="598" y1="123.6" y2="123.6" class="grid"/>
+<text x="32" y="126.6" class="ax" text-anchor="end">-3</text>
+<line x1="38" x2="598" y1="90.1" y2="90.1" class="grid zero"/>
+<text x="32" y="93.1" class="ax" text-anchor="end">0</text>
+<line x1="38" x2="598" y1="56.6" y2="56.6" class="grid"/>
+<text x="32" y="59.6" class="ax" text-anchor="end">+3</text>
+<line x1="38" x2="598" y1="23.2" y2="23.2" class="grid"/>
+<text x="32" y="26.2" class="ax" text-anchor="end">+6</text>
+<text x="38.0" y="242" class="ax" text-anchor="middle">1 Mar</text>
+<text x="133.6" y="242" class="ax" text-anchor="middle">8 Mar</text>
+<text x="229.2" y="242" class="ax" text-anchor="middle">15 Mar</text>
+<text x="324.8" y="242" class="ax" text-anchor="middle">22 Mar</text>
+<text x="420.4" y="242" class="ax" text-anchor="middle">29 Mar</text>
+<text x="516.0" y="242" class="ax" text-anchor="middle">5 Apr</text>
+<polyline points="38.0,70.6 51.7,46.6 65.3,106.8 79.0,98.5 92.6,119.1 106.3,17.0 120.0,25.4 133.6,46.6 147.3,104.6 160.9,150.9 174.6,131.9 188.2,133.1 201.9,96.2 215.6,95.7 229.2,124.7 242.9,116.3 256.5,103.2 270.2,135.9 283.9,113.0 297.5,76.7 311.2,87.9 324.8,101.3 338.5,93.5 352.1,155.9 365.8,103.5 379.5,51.1 393.1,101.8 406.8,109.6 420.4,93.5 434.1,34.3 447.8,71.1 461.4,118.6 475.1,97.4 488.7,46.6 502.4,75.6 516.0,55.0 529.7,56.6 543.4,90.7 557.0,152.6 570.7,128.0 584.3,58.9 598.0,105.2" class="other"><title>S01</title></polyline>
+<polyline points="38.0,79.5 51.7,52.7 65.3,86.2 79.0,74.5 92.6,97.9 106.3,97.9 120.0,93.5 133.6,68.9 147.3,130.3 160.9,108.0 174.6,81.7 188.2,70.0 201.9,74.5 215.6,60.0 229.2,75.6 242.9,70.6 256.5,80.1 270.2,68.9 283.9,82.3 297.5,75.6 311.2,73.4 324.8,91.2 338.5,82.3 352.1,95.7 365.8,70.0 379.5,63.3 393.1,55.5 406.8,85.1 420.4,99.6 434.1,88.4 447.8,92.9 461.4,70.0 475.1,82.6 488.7,89.0 502.4,90.1 516.0,84.5 529.7,66.7 543.4,75.6 557.0,94.6 570.7,65.6 584.3,67.8 598.0,46.6" class="other"><title>S02</title></polyline>
+<polyline points="38.0,87.9 51.7,85.1 65.3,91.2 79.0,90.7 92.6,112.4 106.3,102.4 120.0,97.9 133.6,80.1 147.3,86.8 160.9,104.6 174.6,65.0 188.2,52.2 201.9,70.0 215.6,91.2 229.2,94.6 242.9,102.4 256.5,94.0 270.2,208.4 283.9,158.2 297.5,214.5 311.2,123.6 324.8,97.9 338.5,95.7 352.1,108.0 365.8,77.3 379.5,87.9 393.1,54.4 406.8,73.9 420.4,94.0 434.1,110.2 447.8,120.8 461.4,94.0 475.1,93.5 488.7,101.8 502.4,102.9 516.0,98.5 529.7,88.4 543.4,92.3 557.0,99.6 570.7,80.1 584.3,89.5 598.0,82.9" class="other"><title>S03</title></polyline>
+<polyline points="38.0,102.4 51.7,121.3 65.3,89.5 79.0,87.9 92.6,82.3 106.3,65.0 120.0,89.0 133.6,114.7 147.3,74.5 160.9,112.4 174.6,111.3 188.2,105.2 201.9,112.4 215.6,89.0 229.2,115.8 242.9,106.6 256.5,105.7 270.2,116.9 283.9,101.8 297.5,108.0 311.2,115.2 324.8,95.7 338.5,101.3 352.1,123.6 365.8,119.1 379.5,139.8 393.1,137.0 406.8,123.6 420.4,96.8 434.1,72.3 447.8,85.6 461.4,96.8 475.1,104.1 488.7,87.9 502.4,97.9 516.0,90.7 529.7,131.4 543.4,110.2 557.0,119.1 570.7,109.1 584.3,128.0 598.0,121.3" class="other"><title>S05</title></polyline>
+<polyline points="38.0,65.0 51.7,48.3 65.3,68.9 79.0,96.2 92.6,69.5 106.3,14.2 120.0,72.3 133.6,95.7 147.3,43.2 160.9,57.7 174.6,45.5 188.2,76.2 201.9,83.4 215.6,75.6 229.2,73.4 242.9,32.6 256.5,92.3 270.2,94.6 283.9,78.4 297.5,38.8 311.2,62.2 324.8,71.1 338.5,65.6 352.1,37.7 365.8,42.1 379.5,48.3 393.1,73.9 406.8,87.3 420.4,78.4 434.1,52.7 447.8,27.6 461.4,69.5 475.1,97.9 488.7,85.6 502.4,78.4 516.0,100.1 529.7,82.3 543.4,61.1 557.0,64.4 570.7,78.9 584.3,61.1 598.0,62.8" class="other"><title>S06</title></polyline>
+<polyline points="38.0,97.9 51.7,76.7 65.3,98.5 79.0,93.5 92.6,87.3 106.3,99.0 120.0,70.6 133.6,65.0 147.3,75.6 160.9,58.9 174.6,115.8 188.2,96.8 201.9,80.1 215.6,115.8 229.2,76.7 242.9,97.4 256.5,52.2 270.2,49.9 283.9,91.2 297.5,102.9 311.2,80.1 324.8,86.8 338.5,100.1 352.1,68.3 365.8,99.0 379.5,108.0 393.1,101.3 406.8,86.8 420.4,87.9 434.1,120.8 447.8,115.2 461.4,94.6 475.1,86.8 488.7,78.4 502.4,101.3 516.0,96.8 529.7,102.4 543.4,92.3 557.0,67.8 570.7,104.1 584.3,102.4 598.0,110.7" class="other"><title>S07</title></polyline>
+<polyline points="38.0,121.3 51.7,123.0 65.3,80.6 79.0,94.6 92.6,73.4 106.3,90.1 120.0,64.4 133.6,108.0 147.3,106.8 160.9,83.4 174.6,145.9 188.2,107.4 201.9,108.0 215.6,89.0 229.2,111.3 270.2,92.9 283.9,95.7 297.5,95.1 311.2,101.3 324.8,92.3 338.5,85.6 352.1,81.7 365.8,125.8 379.5,130.8 393.1,118.6 406.8,100.1 420.4,91.2 434.1,112.4 447.8,104.6 461.4,96.2 475.1,91.2 488.7,86.8 502.4,95.7 516.0,96.2 529.7,123.6 543.4,132.5 557.0,108.0 570.7,134.7 584.3,118.6 598.0,116.3" class="other"><title>S08</title></polyline>
+<polyline points="38.0,102.4 51.7,103.5 65.3,89.5 79.0,92.3 92.6,99.6 106.3,103.5 120.0,104.6 133.6,92.3 147.3,66.7 160.9,82.3 174.6,70.6 188.2,90.1 201.9,91.2 215.6,109.1 229.2,86.8 242.9,81.7 256.5,92.9 270.2,89.0 283.9,76.7 297.5,84.5 311.2,74.5 324.8,65.0 338.5,87.9 352.1,77.8 365.8,96.8 379.5,91.2 393.1,73.9 406.8,72.3 420.4,80.6 434.1,63.3 447.8,71.1 461.4,63.9 475.1,79.8 488.7,89.5 502.4,65.6 516.0,72.3 529.7,52.7 543.4,49.9 557.0,47.7 570.7,29.3 584.3,48.8 598.0,15.3" class="focus"/>
+<circle cx="38.0" cy="102.4" r="2.6" class="dot"><title>S04, 01 Mar: -1.1 °C</title></circle>
+<circle cx="51.7" cy="103.5" r="2.6" class="dot"><title>S04, 02 Mar: -1.2 °C</title></circle>
+<circle cx="65.3" cy="89.5" r="2.6" class="dot"><title>S04, 03 Mar: +0.0 °C</title></circle>
+<circle cx="79.0" cy="92.3" r="2.6" class="dot"><title>S04, 04 Mar: -0.2 °C</title></circle>
+<circle cx="92.6" cy="99.6" r="2.6" class="dot"><title>S04, 05 Mar: -0.9 °C</title></circle>
+<circle cx="106.3" cy="103.5" r="2.6" class="dot"><title>S04, 06 Mar: -1.2 °C</title></circle>
+<circle cx="120.0" cy="104.6" r="2.6" class="dot"><title>S04, 07 Mar: -1.3 °C</title></circle>
+<circle cx="133.6" cy="92.3" r="2.6" class="dot"><title>S04, 08 Mar: -0.2 °C</title></circle>
+<circle cx="147.3" cy="66.7" r="2.6" class="dot"><title>S04, 09 Mar: +2.1 °C</title></circle>
+<circle cx="160.9" cy="82.3" r="2.6" class="dot"><title>S04, 10 Mar: +0.7 °C</title></circle>
+<circle cx="174.6" cy="70.6" r="2.6" class="dot"><title>S04, 11 Mar: +1.8 °C</title></circle>
+<circle cx="188.2" cy="90.1" r="2.6" class="dot"><title>S04, 12 Mar: -0.0 °C</title></circle>
+<circle cx="201.9" cy="91.2" r="2.6" class="dot"><title>S04, 13 Mar: -0.1 °C</title></circle>
+<circle cx="215.6" cy="109.1" r="2.6" class="dot"><title>S04, 14 Mar: -1.7 °C</title></circle>
+<circle cx="229.2" cy="86.8" r="2.6" class="dot"><title>S04, 15 Mar: +0.3 °C</title></circle>
+<circle cx="242.9" cy="81.7" r="2.6" class="dot"><title>S04, 16 Mar: +0.8 °C</title></circle>
+<circle cx="256.5" cy="92.9" r="2.6" class="dot"><title>S04, 17 Mar: -0.3 °C</title></circle>
+<circle cx="270.2" cy="89.0" r="2.6" class="dot"><title>S04, 18 Mar: +0.1 °C</title></circle>
+<circle cx="283.9" cy="76.7" r="2.6" class="dot"><title>S04, 19 Mar: +1.2 °C</title></circle>
+<circle cx="297.5" cy="84.5" r="2.6" class="dot"><title>S04, 20 Mar: +0.5 °C</title></circle>
+<circle cx="311.2" cy="74.5" r="2.6" class="dot"><title>S04, 21 Mar: +1.4 °C</title></circle>
+<circle cx="324.8" cy="65.0" r="2.6" class="dot"><title>S04, 22 Mar: +2.2 °C</title></circle>
+<circle cx="338.5" cy="87.9" r="2.6" class="dot"><title>S04, 23 Mar: +0.2 °C</title></circle>
+<circle cx="352.1" cy="77.8" r="2.6" class="dot"><title>S04, 24 Mar: +1.1 °C</title></circle>
+<circle cx="365.8" cy="96.8" r="2.6" class="dot"><title>S04, 25 Mar: -0.6 °C</title></circle>
+<circle cx="379.5" cy="91.2" r="2.6" class="dot"><title>S04, 26 Mar: -0.1 °C</title></circle>
+<circle cx="393.1" cy="73.9" r="2.6" class="dot"><title>S04, 27 Mar: +1.4 °C</title></circle>
+<circle cx="406.8" cy="72.3" r="2.6" class="dot"><title>S04, 28 Mar: +1.6 °C</title></circle>
+<circle cx="420.4" cy="80.6" r="2.6" class="dot"><title>S04, 29 Mar: +0.8 °C</title></circle>
+<circle cx="434.1" cy="63.3" r="2.6" class="dot"><title>S04, 30 Mar: +2.4 °C</title></circle>
+<circle cx="447.8" cy="71.1" r="2.6" class="dot"><title>S04, 31 Mar: +1.7 °C</title></circle>
+<circle cx="461.4" cy="63.9" r="2.6" class="dot"><title>S04, 01 Apr: +2.3 °C</title></circle>
+<circle cx="475.1" cy="79.8" r="2.6" class="dot"><title>S04, 02 Apr: +0.9 °C</title></circle>
+<circle cx="488.7" cy="89.5" r="2.6" class="dot"><title>S04, 03 Apr: +0.0 °C</title></circle>
+<circle cx="502.4" cy="65.6" r="2.6" class="dot"><title>S04, 04 Apr: +2.2 °C</title></circle>
+<circle cx="516.0" cy="72.3" r="2.6" class="dot"><title>S04, 05 Apr: +1.6 °C</title></circle>
+<circle cx="529.7" cy="52.7" r="2.6" class="dot"><title>S04, 06 Apr: +3.3 °C</title></circle>
+<circle cx="543.4" cy="49.9" r="2.6" class="dot"><title>S04, 07 Apr: +3.6 °C</title></circle>
+<circle cx="557.0" cy="47.7" r="2.6" class="dot"><title>S04, 08 Apr: +3.8 °C</title></circle>
+<circle cx="570.7" cy="29.3" r="2.6" class="dot"><title>S04, 09 Apr: +5.4 °C</title></circle>
+<circle cx="584.3" cy="48.8" r="2.6" class="dot"><title>S04, 10 Apr: +3.7 °C</title></circle>
+<circle cx="598.0" cy="15.3" r="2.6" class="dot"><title>S04, 11 Apr: +6.7 °C</title></circle>
+<line x1="38.0" x2="379.5" y1="88.5" y2="88.5" class="fit"/>
+<line x1="379.5" x2="598.0" y1="88.5" y2="37.1" class="fit"/>
+<text x="604.0" y="19.3" class="lab focus-lab">S04</text>
+<text x="604.0" y="109.2" class="lab">the other 7</text>
+</svg>
+      <figcaption>Each day: afternoon temperature minus night temperature, compared with the other stations (&deg;C). A healthy station sits near zero. S04 (red) lifts from late March; the dashed line is the fitted ramp. The grey lines are the other seven stations.</figcaption>
+    </figure>
+    <div class="why">
+      <h2 style="font-size:10.5pt">Why S04 and not S07</h2>
+      <ul>
+        <li><b>Temperature is the number the summary is about;</b> wind speed is a side measurement.</li>
+        <li><b>S07 can be settled by a photo.</b> S04 cannot: the cause is on the post.</li>
+        <li><b>S04 gets worse each sunny week,</b> so waiting costs more data than at S07, where the loss is already total but not growing.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="box" style="margin-top:9px">
+    <strong>Left-out stretches are holes, not guesses.</strong> Nothing was filled in; averages there use the readings that remain.
+    S01 on the ridge was healthy: its 60&nbsp;km/h gust on 14 Mar was a real storm six other stations felt too, and the 100&nbsp;% humidity on 30 Mar (S05, S06) is real saturation, so both stay in.
+  </div>
+
+  <footer><span>Source: flags.csv &mdash; 23 decisions, each with its evidence.</span><span>Page 1 of 2</span></footer>
+</section>
+
+<!-- ============================== PAGE 2 ============================== -->
+<section class="page" aria-label="Page 2">
+  <h2 style="font-size:14pt;margin-bottom:2px">What went wrong, station by station</h2>
+  <div class="sub" style="margin:0 0 4px">Worst first. "Left out" means removed from the summary, never replaced by an estimate.</div>
+
+  <table class="what">
+    <thead><tr><th>Station</th><th>What the data show</th><th>What I did</th><th>What is needed</th></tr></thead>
+    <tbody>
+      <tr class="go"><td>S04<small>Foothills Garden</small></td>
+        <td>Afternoon temperature has run warmer than neighbours since about 26 Mar: +4.9&nbsp;&deg;C by 11 Apr and still rising; nights are normal. The rain gauge caught nothing for 4&frac12; days while neighbours caught about 31&nbsp;mm.</td>
+        <td>Afternoon temperatures left out (80&nbsp;% of the temperature record remains). Blocked-gauge days left out, and so is the 33&nbsp;mm that arrived in 30 minutes when it was cleaned: that is the missing rain turning up late, good only as a 5-day total.</td>
+        <td><span class="pill visit">Technician visit</span><br>Shield, post, gauge. Needed to stop further loss and to learn the size of the error.</td></tr>
+      <tr><td>S07<small>Riverbend Farm</small></td>
+        <td>Since the new anemometer on 26 Mar, wind reads only 0.27&times; what the neighbours say it should. Direction is normal.</td>
+        <td>Wind speed left out from 26 Mar (61&nbsp;% remains). Not corrected: the right factor is unknown. 0.27 is close to 1/3.6, so the new unit may report metres per second.</td>
+        <td><span class="pill ask">Ask, no visit</span><br>A photo of the new anemometer's label would settle it.</td></tr>
+      <tr><td>S03<small>Valley Library</small></td>
+        <td>The temperature sensor froze at 6.5&nbsp;&deg;C for 80 hours (18&ndash;21 Mar) and four times reported &minus;40 or 85&nbsp;&deg;C, which are error codes, not weather.</td>
+        <td>Only those readings left out (92&nbsp;% of temperature remains).</td>
+        <td><span class="pill ask">Ask</span><br>The last error was 8 Apr: ask the volunteer to check the sensor cable.</td></tr>
+      <tr><td>S05<small>Eastside Rec Centre</small></td>
+        <td>Humidity stuck above 100&nbsp;% from 7 Mar to 11 Mar (impossible), then recovered by itself. Separately, the location on the install sheet is 20&nbsp;km from where the GPS says the station is: two digits of the latitude are swapped.</td>
+        <td>Stuck days left out (92&nbsp;% remains). Sheet corrected to 39.754&nbsp;N; weather readings are not affected by this.</td>
+        <td><span class="pill sheet">Paperwork</span><br>Update stations.csv. Watch humidity.</td></tr>
+      <tr><td>S06<small>South Hills Fire Stn</small></td>
+        <td>After the battery change on 24 Mar the logger's clock ran 6&nbsp;hours slow, so every later reading is stamped at the wrong hour. GPS and the sun's position both agree.</td>
+        <td>Added 6&nbsp;hours back to the 2,639 affected rows; the weather values were fine. Nothing left out.</td>
+        <td><span class="pill ask">Ask</span><br>The clock was still 6&nbsp;h slow on 11 Apr; ask the volunteer to reset it.</td></tr>
+      <tr><td>S08<small>Plains Grange Hall</small></td>
+        <td>36&nbsp;hours missing (16&ndash;18 Mar). The GPS log is silent too, so the logger itself was off, not just the website. One whole day (5 Apr) is stored twice.</td>
+        <td>Gap left as a gap. The repeated day removed once (96&nbsp;% of records remain).</td>
+        <td><span class="pill none">Nothing on site</span><br>Check the SIM plan renews itself.</td></tr>
+      <tr><td>S02<small>North Mesa School</small></td>
+        <td>When the pressure board was swapped on 21 Mar (not calibrated), pressure jumped by 6.6&nbsp;hPa overnight and stayed there.</td>
+        <td>Subtracted 6.6&nbsp;hPa from everything after the swap. The earlier level matched the other stations and the station's height.</td>
+        <td><span class="pill none">Later</span><br>Calibrate the new board when convenient.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="unsure">
+    <strong>Where I am less certain</strong>
+    <ul>
+      <li>The S04 drift may have started on 15 Mar, when the post was repainted, but it only becomes clear in late March; I excluded from the date the data show it.</li>
+      <li>S02's correction assumes the new board is off by a constant amount; only calibration would prove it.</li>
+      <li>S07's factor is a hunch from the numbers until someone reads the label.</li>
+    </ul>
+  </div>
+
+  <footer><span>Every decision above is one line in flags.csv; DECISIONS.md gives the reasoning.</span><span>Page 2 of 2</span></footer>
+</section>
+</body>
+</html>

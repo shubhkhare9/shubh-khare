@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridgeline network health check</title>
+<style>
+  :root {
+    --ink: #1c2a2b; --muted: #5a6b6c; --rule: #c9d2d0; --paper: #fbfaf6;
+    --ok: #e3efe6; --ok-ink: #1d5b34; --fix: #e1ebf4; --fix-ink: #23527a;
+    --part: #f7ecd2; --part-ink: #7a5300; --bad: #f4dcd2; --bad-ink: #8f2f10;
+    --accent: #1f6f6b;
+  }
+  * { box-sizing: border-box; }
+  html { background: #e8e6df; }
+  body { margin: 0; color: var(--ink); font: 10.2pt/1.42 "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; margin: 8mm auto; padding: 13mm 14mm 11mm; background: var(--paper); position: relative;
+          overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+  @page { size: A4; margin: 0; }
+  @media print { html { background: none; } .page { margin: 0; box-shadow: none; break-after: page; } .page:last-child { break-after: auto; } }
+  @media (max-width: 800px) { .page { width: auto; height: auto; margin: 0; padding: 16px; overflow: visible; box-shadow: none; } }
+
+  h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  h1 { font-size: 21pt; line-height: 1.12; }
+  h2 { font-size: 12.5pt; margin-bottom: 4px; }
+  .kicker { font-size: 8.3pt; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 9.2pt; margin-top: 4px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 10px; }
+
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 11px; }
+  .ans { border-top: 3px solid var(--accent); padding: 6px 0 0; }
+  .ans .q { font-size: 8.3pt; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .ans .a { font-family: Georgia, serif; font-size: 13.2pt; line-height: 1.2; margin: 2px 0 5px; }
+  .ans p { margin: 0 0 4px; font-size: 9.6pt; }
+  .ans ul { margin: 3px 0 0; padding-left: 15px; font-size: 9.4pt; }
+  .ans li { margin-bottom: 2px; }
+  .ans.go { border-top-color: var(--bad-ink); }
+
+  table.grid { width: 100%; border-collapse: collapse; font-size: 8.6pt; table-layout: fixed; }
+  table.grid th { font-weight: 600; text-align: center; padding: 3px 2px; border-bottom: 1.5px solid var(--ink); font-size: 8pt; }
+  table.grid th[scope=row] { text-align: left; font-weight: 400; padding: 0 4px 0 0; border-bottom: 1px solid var(--rule); white-space: nowrap; width: 33%; overflow: hidden; text-overflow: ellipsis; }
+  table.grid th[scope=row] b { font-family: Georgia, serif; }
+  .nm { color: var(--muted); font-size: 7.8pt; }
+  .tag { font-size: 7pt; background: var(--part); color: var(--part-ink); padding: 0 4px; border-radius: 2px; margin-left: 3px; }
+  td.c { text-align: center; border: 2px solid var(--paper); height: 23px; font-weight: 600; }
+  td.ok { background: var(--ok); color: var(--ok-ink); }
+  td.fixed { background: var(--fix); color: var(--fix-ink); }
+  td.part { background: var(--part); color: var(--part-ink); }
+  td.bad { background: var(--bad); color: var(--bad-ink); }
+  td.c .pct { font-size: 7.4pt; font-weight: 500; margin-left: 3px; }
+  .sr { position: absolute; left: -9999px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 8.3pt; color: var(--muted); margin: 6px 0 0; }
+  .legend b { display: inline-block; min-width: 18px; text-align: center; padding: 0 3px; border-radius: 2px; margin-right: 3px; }
+  .legend .ok b { background: var(--ok); color: var(--ok-ink); } .legend .fixed b { background: var(--fix); color: var(--fix-ink); }
+  .legend .part b { background: var(--part); color: var(--part-ink); } .legend .bad b { background: var(--bad); color: var(--bad-ink); }
+
+  .box { border: 1px solid var(--rule); background: #fff; padding: 7px 10px; margin-top: 10px; font-size: 9.4pt; }
+  .box strong { font-family: Georgia, serif; }
+
+  table.what { width: 100%; border-collapse: collapse; font-size: 8.9pt; margin-top: 4px; }
+  table.what th { text-align: left; font-size: 7.8pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 3px 6px 3px 0; font-weight: 600; }
+  table.what td { vertical-align: top; padding: 5px 8px 5px 0; border-bottom: 1px solid var(--rule); }
+  table.what td:first-child { width: 17%; font-family: Georgia, serif; }
+  table.what td:first-child small { display: block; font-family: "Segoe UI", Helvetica, Arial, sans-serif; color: var(--muted); font-size: 7.8pt; }
+  table.what td:nth-child(2) { width: 36%; } table.what td:nth-child(3) { width: 27%; }
+  table.what tr.go td:first-child { border-left: 3px solid var(--bad-ink); padding-left: 6px; }
+  .pill { display: inline-block; font-size: 7.6pt; font-weight: 600; padding: 0 5px; border-radius: 2px; margin-bottom: 2px; }
+  .pill.visit { background: var(--bad); color: var(--bad-ink); } .pill.ask { background: var(--part); color: var(--part-ink); }
+  .pill.none { background: var(--ok); color: var(--ok-ink); } .pill.sheet { background: var(--fix); color: var(--fix-ink); }
+
+  .two { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-top: 10px; align-items: start; }
+  .chart { width: 100%; height: auto; display: block; }
+  .chart .grid { stroke: #dfe5e3; stroke-width: 1; } .chart .grid.zero { stroke: #8b9896; }
+  .chart .ax { font-size: 9px; fill: var(--muted); } .chart .lab { font-size: 10px; fill: var(--muted); }
+  .chart .focus-lab { fill: var(--bad-ink); font-weight: 700; }
+  .chart .other { fill: none; stroke: #a9b5b3; stroke-width: 1; opacity: .75; }
+  .chart .focus { fill: none; stroke: var(--bad-ink); stroke-width: 1.8; } .chart .dot { fill: var(--bad-ink); }
+  .chart .fit { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  figcaption { font-size: 8.4pt; color: var(--muted); margin-top: 2px; }
+  figure { margin: 0; }
+  .why p { margin: 0 0 5px; font-size: 9.2pt; } .why ul { margin: 0; padding-left: 14px; font-size: 9.2pt; } .why li { margin-bottom: 3px; }
+  .unsure { margin-top: 9px; font-size: 9pt; } .unsure ul { margin: 2px 0 0; padding-left: 15px; } .unsure li { margin-bottom: 2px; }
+  footer { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; font-size: 7.8pt; color: var(--muted); display: flex; justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- ============================== PAGE 1 ============================== -->
+<section class="page" aria-label="Page 1">
+  <header>
+    <div class="kicker">Ridgeline Schools Weather Network &middot; health check</div>
+    <h1>Can we trust this spring's weather data, and where should the technician go?</h1>
+    <div class="sub">Eight stations, [[period]], a reading every 10 minutes. Prepared for the network coordinator.</div>
+  </header>
+
+  <div class="answers">
+    <div class="ans">
+      <div class="q">1 &middot; Which data can go in the spring summary?</div>
+      <div class="a">Almost all of it. Two series are not usable after 26 March.</div>
+      <p>Of the [[n_series]] station-measurements (8 stations &times; 7 measurements), <b>[[clean_series]] are good exactly as sent</b> and <b>[[fixed_series]] are good after I corrected them</b> (S06's clock and S02's pressure).
+         [[part_series]] have a short hole that I left out, and <b>[[bad_series]] should not be used</b> for the rest of the period:</p>
+      <ul>
+        <li><b>S04 afternoon temperature</b> since 26 Mar</li>
+        <li><b>S07 wind speed</b> since 26 Mar</li>
+      </ul>
+    </div>
+    <div class="ans go">
+      <div class="q">2 &middot; Where should the technician go next week?</div>
+      <div class="a">S04, Foothills Community Garden.</div>
+      <p>Its afternoon temperature has crept up to <b>[[s04_last]]&nbsp;&deg;C too warm</b> and is still growing, which would spoil the headline number of a climate summary. Nobody can fix that without being there.</p>
+      <p style="margin:0">One hour: check the temperature shield and the white-painted post, compare with a hand thermometer, and look at the rain gauge cleaned on 2 April.</p>
+    </div>
+  </div>
+
+  <h2>Station by measurement</h2>
+  [[grid]]
+  <div class="legend" aria-label="legend">
+    <span class="ok"><b>&#10003;</b>good as sent</span>
+    <span class="fixed"><b>&#8635;</b>good after correction</span>
+    <span class="part"><b>&frac12;</b>a stretch left out (share still usable)</span>
+    <span class="bad"><b>&#10005;</b>not usable from the fault onwards (share still usable)</span>
+  </div>
+
+  <div class="two">
+    <figure>
+      <h2 style="font-size:10.5pt;margin-bottom:2px">Why S04: the error grows with the sun</h2>
+      [[chart]]
+      <figcaption>Each day: afternoon temperature minus night temperature, compared with the other stations (&deg;C). A healthy station sits near zero. S04 (red) lifts from late March; the dashed line is the fitted ramp. The grey lines are the other seven stations.</figcaption>
+    </figure>
+    <div class="why">
+      <h2 style="font-size:10.5pt">Why S04 and not S07</h2>
+      <ul>
+        <li><b>Temperature is the number the summary is about;</b> wind speed is a side measurement.</li>
+        <li><b>S07 can be settled by a photo.</b> S04 cannot: the cause is on the post.</li>
+        <li><b>S04 gets worse each sunny week,</b> so waiting costs more data than at S07, where the loss is already total but not growing.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="box" style="margin-top:9px">
+    <strong>Left-out stretches are holes, not guesses.</strong> Nothing was filled in; averages there use the readings that remain.
+    S01 on the ridge was healthy: its 60&nbsp;km/h gust on 14 Mar was a real storm six other stations felt too, and the 100&nbsp;% humidity on 30 Mar (S05, S06) is real saturation, so both stay in.
+  </div>
+
+  <footer><span>Source: flags.csv &mdash; [[n_flags]] decisions, each with its evidence.</span><span>Page 1 of 2</span></footer>
+</section>
+
+<!-- ============================== PAGE 2 ============================== -->
+<section class="page" aria-label="Page 2">
+  <h2 style="font-size:14pt;margin-bottom:2px">What went wrong, station by station</h2>
+  <div class="sub" style="margin:0 0 4px">Worst first. "Left out" means removed from the summary, never replaced by an estimate.</div>
+
+  <table class="what">
+    <thead><tr><th>Station</th><th>What the data show</th><th>What I did</th><th>What is needed</th></tr></thead>
+    <tbody>
+      <tr class="go"><td>S04<small>Foothills Garden</small></td>
+        <td>Afternoon temperature has run warmer than neighbours since about [[s04_onset]]: [[s04_last]]&nbsp;&deg;C by 11 Apr and still rising; nights are normal. The rain gauge caught nothing for 4&frac12; days while neighbours caught about [[rain_nb]]&nbsp;mm.</td>
+        <td>Afternoon temperatures left out ([[s04_temp_pct]]&nbsp;% of the temperature record remains). Blocked-gauge days left out, and so is the [[burst_mm]]&nbsp;mm that arrived in 30 minutes when it was cleaned: that is the missing rain turning up late, good only as a 5-day total.</td>
+        <td><span class="pill visit">Technician visit</span><br>Shield, post, gauge. Needed to stop further loss and to learn the size of the error.</td></tr>
+      <tr><td>S07<small>Riverbend Farm</small></td>
+        <td>Since the new anemometer on 26 Mar, wind reads only [[s07_ratio]]&times; what the neighbours say it should. Direction is normal.</td>
+        <td>Wind speed left out from 26 Mar ([[s07_wind_pct]]&nbsp;% remains). Not corrected: the right factor is unknown. [[s07_ratio]] is close to 1/3.6, so the new unit may report metres per second.</td>
+        <td><span class="pill ask">Ask, no visit</span><br>A photo of the new anemometer's label would settle it.</td></tr>
+      <tr><td>S03<small>Valley Library</small></td>
+        <td>The temperature sensor froze at 6.5&nbsp;&deg;C for [[s03_h]] hours (18&ndash;21 Mar) and four times reported &minus;40 or 85&nbsp;&deg;C, which are error codes, not weather.</td>
+        <td>Only those readings left out ([[s03_pct]]&nbsp;% of temperature remains).</td>
+        <td><span class="pill ask">Ask</span><br>The last error was 8 Apr: ask the volunteer to check the sensor cable.</td></tr>
+      <tr><td>S05<small>Eastside Rec Centre</small></td>
+        <td>Humidity stuck above 100&nbsp;% from [[s05_from]] to [[s05_to]] (impossible), then recovered by itself. Separately, the location on the install sheet is [[s05_km]]&nbsp;km from where the GPS says the station is: two digits of the latitude are swapped.</td>
+        <td>Stuck days left out ([[s05_pct]]&nbsp;% remains). Sheet corrected to 39.754&nbsp;N; weather readings are not affected by this.</td>
+        <td><span class="pill sheet">Paperwork</span><br>Update stations.csv. Watch humidity.</td></tr>
+      <tr><td>S06<small>South Hills Fire Stn</small></td>
+        <td>After the battery change on 24 Mar the logger's clock ran 6&nbsp;hours slow, so every later reading is stamped at the wrong hour. GPS and the sun's position both agree.</td>
+        <td>Added 6&nbsp;hours back to the [[s06_rows]] affected rows; the weather values were fine. Nothing left out.</td>
+        <td><span class="pill ask">Ask</span><br>The clock was still 6&nbsp;h slow on [[s06_end]]; ask the volunteer to reset it.</td></tr>
+      <tr><td>S08<small>Plains Grange Hall</small></td>
+        <td>[[s08_h]]&nbsp;hours missing (16&ndash;18 Mar). The GPS log is silent too, so the logger itself was off, not just the website. One whole day (5 Apr) is stored twice.</td>
+        <td>Gap left as a gap. The repeated day removed once ([[s08_pct]]&nbsp;% of records remain).</td>
+        <td><span class="pill none">Nothing on site</span><br>Check the SIM plan renews itself.</td></tr>
+      <tr><td>S02<small>North Mesa School</small></td>
+        <td>When the pressure board was swapped on 21 Mar (not calibrated), pressure jumped by [[s02_off]]&nbsp;hPa overnight and stayed there.</td>
+        <td>Subtracted [[s02_off]]&nbsp;hPa from everything after the swap. The earlier level matched the other stations and the station's height.</td>
+        <td><span class="pill none">Later</span><br>Calibrate the new board when convenient.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="unsure">
+    <strong>Where I am less certain</strong>
+    <ul>
+      <li>The S04 drift may have started on 15 Mar, when the post was repainted, but it only becomes clear in late March; I excluded from the date the data show it.</li>
+      <li>S02's correction assumes the new board is off by a constant amount; only calibration would prove it.</li>
+      <li>S07's factor is a hunch from the numbers until someone reads the label.</li>
+    </ul>
+  </div>
+
+  <footer><span>Every decision above is one line in flags.csv; DECISIONS.md gives the reasoning.</span><span>Page 2 of 2</span></footer>
+</section>
+</body>
+</html>
