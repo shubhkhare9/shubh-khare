@@ -1,7 +1,7 @@
 Shubh Khare
 shubhkhare.sk11@gmail.com
-Video: ADD-YOUR-UNLISTED-VIDEO-LINK-HERE (3-minute screen recording; script in docs/video_script.md)
-Run: python checker.py <pack folder>   (example: python checker.py ./ridgeline_data_pack)
+Video: [3-minute screen recording](https://drive.google.com/file/d/1zfcDi6UL5607gTeyJ1TV6sjUw6x_jvZ_/view?usp=sharing)
+Run: python3 checker.py "/path/to/ridgeline_data_pack"
 
 ---
 
@@ -90,4 +90,3 @@ constant: slope 1.00 before and 1.01 after the swap).
 - Wind direction gets only range, frozen-vane and 'calm' logic; there is no neighbour comparison for it (direction is too local).
 - `flags.csv` times for a re-timed block (S06) are given on the corrected UTC clock; the note gives the logger's own labels.
 - I have not run it on stations with a logging interval other than 10 minutes beyond the synthetic test.
-- The video link above must be filled in after recording.

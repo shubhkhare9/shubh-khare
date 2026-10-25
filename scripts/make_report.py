@@ -57,20 +57,23 @@ def grid_states(res):
 
 def drift_chart(res):
     sts = res["stations"]
-    from src.peer_frames import Peers
-    peers = Peers(sts)
+    # Use unmasked readings so the chart still shows the period that was excluded.
+    raw = {k: v.clean["temp_c"].where(~v.clean["temp_c"].isin([85.0, -40.0])) for k, v in sts.items()}
+    frame = pd.concat(raw, axis=1)
+    centred = frame - frame.median()
     series = {}
     for sid, s in sts.items():
         idx = s.clean.index
         el = pd.Series(solar_elevation_deg(idx, s.lat_for_solar, s.lon_for_solar), index=idx)
-        # use the *unmasked* temperatures so the chart shows what the sensor actually did
-        raw = {k: v.clean["temp_c"].where(~v.clean["temp_c"].isin([85.0, -40.0])) for k, v in sts.items()}
-        frame = pd.concat(raw, axis=1)
-        c = frame - frame.median()
-        ref = c.drop(columns=[sid]).median(axis=1)
-        r = c[sid] - ref
+        ref = centred.drop(columns=[sid]).median(axis=1)
+        r = centred[sid] - ref
         e = pd.DataFrame({"r": r, "d": _local_day(idx, s.lon)})
         ex = (e[el > 30].groupby("d").r.median() - e[el < -6].groupby("d").r.median()).dropna()
+        fit = hinge_fit(ex) if sid == "S04" else None
+        ex = ex.rolling(3, min_periods=1).mean()
+        if sid == "S04":
+            if fit:
+                ex = ex - fit["base"]
         series[sid] = ex
     return series
 

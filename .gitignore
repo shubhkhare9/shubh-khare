@@ -9,3 +9,4 @@ maintenance_log.md
 __pycache__/
 .pytest_cache/
 iforest_candidates.csv
+.DS_Store

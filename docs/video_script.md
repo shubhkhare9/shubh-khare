@@ -1,15 +1,44 @@
-# 3-minute screen recording (voice, no slides)
+# Video Script
 
-**0:00-0:15** Say your name. "Aeron checker: python checker.py PACK writes flags.csv. I'll show my strongest flag and my least certain flag."
 
-**0:15-1:35 Strongest: S06 clock (flag `Logger clock wrong after restart`).**
-1. Open data/S06.csv at row 3408-3410 (2025-03-24 16:00 then 10:10): "time steps back 5 h 50 min, but pressure 813.4 -> 813.5, temperature 14.0 -> 14.6 carry on smoothly - so it's new data on a wrong clock, not a replay."
-2. Open gps/S06.nmea: logger stamp 11:00:01 but the sentence says 170000: "GPS is 6 h ahead, 435 fixes, spread 2 s."
-3. Show the maintenance log 24 Mar: battery, reboot. "The volunteer thought the clock looked right on the screen."
-4. Show flags.csv row: corrected +6 h, and the sunlight curve peaking 6 h early. Mention the same trick caught S08: GPS silent during the gap, exact repeated day.
+## Introduction
 
-**1:35-2:40 Least certain: S07 wind.** Show flags.csv row; plot/open S07 wind vs neighbours: drops to 0.27x on 26 Mar 15:40. "0.27 is close to 1/3.6, which would be m/s in a km/h column - but neighbours are 40-120 km away and I only noticed it after seeing the number. So I excluded, not corrected. One fact settles it: the unit on the new anemometer's label."
+Hello, my name is Shubh Khare. In this project, I developed a weather-data quality checker for the Ridgeline Schools Weather Network.
 
-**2:40-3:00** "Technician goes to S04: afternoon temperature +4.9 C and growing; S07 can be settled by a photo. Everything is in DECISIONS.md and report.html. Thanks."
+The dataset contains readings from eight weather stations, collected every ten minutes between March and April 2025.
 
-Record with any free recorder; upload unlisted; paste the link into line 3 of README.md.
+My objective was to identify unreliable readings, understand possible causes, and decide which data should be kept, corrected, or excluded.
+
+## Confident call: S06 logger clock
+
+Here, I am running the checker on the provided dataset.
+
+The program successfully loaded all eight stations and generated 23 flags. Each flag contains information about a potential issue, the affected station and measurement, and the recommended action.
+
+The output contains three types of decisions: keep, correct, and exclude.
+
+There are eight keep decisions, three correction decisions, and twelve exclusion decisions.
+
+An important example is the strong wind recorded by S01. Other stations also recorded strong winds around the same time, so I kept this reading instead of incorrectly treating a real storm as a sensor fault.
+
+For S02, the pressure readings showed a consistent offset after a board replacement. The checker recommends correcting that offset.
+
+## Least certain call: S07 wind
+
+This is the network health report. It summarises the quality of each station's measurements and explains the main issues.
+
+The most important recommendation is to visit S04, Foothills Community Garden. Its afternoon temperature readings increasingly differ from neighbouring stations, reaching approximately 4.9 degrees Celsius warmer by 11 April. The night-time readings remain much closer to the other stations.
+
+The rain gauge also appears to have been blocked, so the affected rainfall readings should not be interpreted as normal dry weather.
+
+For S06, the logger clock was six hours behind, and the report describes correcting the timestamps. For S07, wind-speed readings were excluded because the correct calibration factor could not be confirmed.
+
+## Technician choice and close
+
+I documented the reasoning behind the main decisions and the limitations of the analysis.
+
+I used data validation, patterns over time, comparisons with neighbouring stations, GPS information, and maintenance records to investigate suspicious readings.
+
+I also considered the risk of removing genuine weather events. Where the evidence did not support a reliable correction, I avoided guessing the corrected value.
+
+Overall, this project demonstrates a reusable and explainable approach to weather-data quality checking. Thank you.

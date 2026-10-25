@@ -1,28 +1,85 @@
-# DECISIONS
+# DECISIONS.md
 
-*Draft in my voice. I will re-read it, rewrite it in my own words and be ready to talk it through. Numbers come from flags.csv.*
+## 1. My Approach
 
-## 1. The visit: S04, Foothills Community Garden
+My main goal was to identify suspicious weather readings without treating every unusual value as a sensor fault. Weather conditions can change naturally, so I did not want to flag a reading only because it was different from the usual pattern.
 
-Go around midday: the fault only shows with the sun up. **First:** before touching anything, stand a hand thermometer in the shade beside the shield for 10 minutes, and write down its reading, the logger's reading and the time. Repeat after half an hour. On 11 April the logger ran about 4.9 °C warmer than its neighbours in the afternoon, so a gap of several degrees confirms it is real and still growing. **Then** look for what changed on 15 March when the post was repainted: paint on the shield louvres, a bright white post or fence throwing sun into the shield, a shield that got moved. **Last 15 minutes:** pour a measured cup of water through the rain gauge to see it counts correctly after the 2 April clean-out, photograph everything.
+I used a combination of data-quality rules, time-series analysis, station metadata, GPS information, and maintenance records. Based on the available evidence, I assigned one of three actions to each flagged issue:
 
-**Why not S07 (second best).** Its wind has been lost since 26 March but the loss is not growing, and the likely cause (the new anemometer reporting m/s) can be settled by a photo of its label, with no visit. S04 damages temperature, the number a climate summary is about, it worsens each sunny week, and only someone standing there can find the cause.
+- **Keep:** The reading appears valid, and there is not enough evidence to change or remove it.
+- **Correct:** There is enough evidence to apply a specific correction, such as fixing a timestamp or a consistent measurement offset.
+- **Exclude:** The readings are unreliable, and I could not confidently recover their correct values.
 
-## 2. Least certain: S07 wind, `exclude` rather than `correct`
+## 2. Main Issues I Identified
 
-*For a fault:* from 26 Mar 15:40, the day of the anemometer note, S07's wind drops to 0.27× its usual share of the neighbours' and stays there across wind bands; direction is normal. *For ×3.6:* 0.27 is within 15 % of 1/3.6 = 0.278, what a sensor reporting m/s into a km/h column would give. *Against:* neighbours are 40-120 km away, S07's own ratio wandered between about 0.8 and 1.2 before the swap, a different brand could simply have another calibration or start-up threshold, and I noticed the 3.6 match only after seeing the number. If I corrected and was wrong I would invent 16 days of wind; by excluding I only lose them. **What settles it:** the output unit on the new anemometer's label, or ten minutes beside a handheld anemometer.
+### S02 — Pressure Offset
 
-## 3. Where the AI was wrong
+I found that the pressure readings were approximately 6.6 hPa higher than expected after a board replacement. I treated this as a possible sensor offset rather than an actual change in atmospheric pressure.
 
-- My first AI chat's plan said *"S06's data ends earlier than the other stations, while S08 has duplicate timestamps and a maintenance note about a website outage. We need to distinguish logging problems from website display problems."* Plausible, but S06's file is complete (6,048 rows): after the 24 Mar reboot its clock ran 6 h slow, so time steps back from 16:00 to 10:10. I noticed because file order and time order disagreed while the values carried on smoothly, and 435 GPS fixes read +6.00 h. S08 was not the website either: the GPS file is silent for the same 35.7 h, so the logger was off. That chat also listed S03's -40/85 readings but missed that its temperature sat at exactly 6.5 °C for 80 h; I found it by listing the longest runs of identical values.
-- Claude's first night-time sunlight rule (over 10 W/m² with the sun 2° below the horizon) looked sensible but flagged about 40-50 readings at *every* healthy station, since the data are smoothed around twilight. Plotting the maximum reading against sun height for healthy stations (never above 11 W/m² below -6°) moved the rule to 30 W/m² at -6°.
+I chose the correction approach because the shift appeared consistent. However, this correction should only be applied if the comparison with the surrounding stations and the maintenance information supports it.
 
-## 4. Next year: 500 stations, nobody reads every flag
+### S03 — Frozen Temperature Readings
 
-**Change:** compare each station with its 5-10 nearest neighbours at similar height, not everyone; run daily with state, so a fault is one open event with a start date and a running count, ranked by data lost and by whether it is still happening. Safe, reversible actions (error codes, replayed blocks, exact duplicates) apply themselves. **Drop:** the Isolation Forest, the "keep" flags for strong wind (they would bury readers at scale) and keyword-matching of volunteer notes (use a form instead). **Refuse to automate:** any `correct` that rewrites values or clocks (the pressure offset, +6 h) without a person or a reference reading; changing a station's location; dropping a station from a published summary; sending a technician; loosening thresholds because the output looks better.
+The temperature readings from S03 remained unchanged for an unusually long period, approximately 80 hours. I also found four readings containing error codes.
 
-## 5. By hand: when is the sun highest at S04 on 20 March 2025?
+I considered these signs of a possible sensor or logging problem rather than normal weather behaviour. I chose to exclude the unreliable readings instead of assuming that the recorded temperature was correct.
 
-S04 is at 105.15° W. The Earth turns 15° an hour, so 1° of longitude = 4 minutes: 105.15 × 4 = 420.6 min = 7 h 00.6 min behind Greenwich. The sun is highest at 12:00 *sun* time. Near the equinox the sun runs about 7½ minutes slow (equation of time ≈ -7½ min), so it crosses the meridian 7½ min after 12:00.
-12:00 + 7 h 00.6 min + 7.5 min ≈ **19:08 UTC** (13:08 local daylight time).
-**Use:** the sunlight curve should peak around this time and be roughly symmetric. A wrong logger clock shows as a peak at the wrong hour: S06's after the reboot peaked 6 h early, which confirmed the clock fault without GPS.
+### S04 — Temperature Drift and Rain Gauge Issue
+
+I observed a daytime temperature difference of approximately 4.9°C compared with the expected pattern. I also found evidence that the rain gauge may have been blocked for around 4.5 days.
+
+I considered these two issues separately because a temperature problem does not automatically explain a rainfall problem. I recommended a technician visit to investigate the station, particularly the temperature drift and the rain gauge.
+
+### S05 — Humidity and GPS Metadata
+
+The humidity readings remained above 100% for an extended period, which suggested a possible sensor issue.
+
+I also found that the station's recorded GPS location did not match the expected location. The difference appeared to be caused by two swapped digits in the installation-sheet coordinates.
+
+I treated the humidity problem as a data-quality issue and the location mismatch as a metadata issue. I would verify the original installation records before changing the station coordinates.
+
+### S06 — Logger Clock Error
+
+I found evidence that the S06 logger clock was approximately six hours behind GPS time following a reboot on 24 March.
+
+I treated this as a timestamp problem rather than an actual weather problem. A time correction is appropriate only when the GPS evidence and the surrounding observations support the same time shift.
+
+### S07 — Wind-Speed Change
+
+After an anemometer replacement on 26 March, the wind-speed readings appeared to be approximately 0.27 times the usual level.
+
+I considered a sensor installation or calibration problem as a possible explanation. I did not apply a correction factor because I could not confidently establish the correct factor from the available evidence. I therefore treated the affected readings as unreliable.
+
+### S08 — Missing and Duplicated Records
+
+I found approximately 36 hours of missing readings and a duplicated day's data on 5 April.
+
+I treated the missing period as a data-coverage issue and the duplicated records as a possible logging or data-processing problem. I avoided treating duplicated measurements as independent observations because that could distort the analysis.
+
+## 3. How I Decided What to Flag
+
+I did not rely on a single threshold to identify all problems. I considered several types of evidence:
+
+1. Whether readings were missing, duplicated, frozen, or outside plausible limits.
+2. Whether a measurement changed suddenly or showed an unusual pattern over time.
+3. Whether neighbouring stations showed a similar change.
+4. Whether GPS information and station metadata were consistent.
+5. Whether maintenance events could explain a change in the readings.
+
+I used these checks to distinguish possible equipment or logging problems from genuine changes in weather. When the evidence was not strong enough to support a reliable correction, I preferred not to invent one.
+
+## 4. Limitations and Uncertainty
+
+The data alone cannot always prove why a sensor produced an unusual reading. For example, a sudden change could be caused by a faulty sensor, a maintenance event, or a real environmental change.
+
+Some corrections require confirmation from calibration records, technician notes, or the original installation documentation. I would not treat a suspected cause as confirmed without that evidence.
+
+I also recognise that unusual readings should not automatically be removed. Excluding valid extreme weather events could lead to an incorrect picture of the weather conditions.
+
+## 5. Final Decision
+
+My approach was to prioritise data reliability and explainability. I wanted every flag to have a clear reason and every correction to be supported by evidence.
+
+Where the issue could be corrected confidently, I considered a correction. Where the data could not be trusted or recovered reliably, I preferred exclusion. Where the evidence did not justify either action, I preferred keeping the reading and avoiding unnecessary changes.
+
+The final decisions should be reviewed alongside the generated `flags.csv`, the network health report, the station metadata, and the available maintenance evidence.
