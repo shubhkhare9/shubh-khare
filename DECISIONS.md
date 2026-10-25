@@ -1,85 +1,21 @@
 # DECISIONS.md
 
-## 1. My Approach
+## 1. Technician visit: S04
 
-My main goal was to identify suspicious weather readings without treating every unusual value as a sensor fault. Weather conditions can change naturally, so I did not want to flag a reading only because it was different from the usual pattern.
+I would spend the one-hour visit at S04. First I would inspect the rain-gauge funnel, tipping mechanism and wiring, then compare a manual tip with the logger count. The log records leaves and a bird nest in the funnel; during that period S04 recorded zero while neighbours measured 31.0 mm, followed by a 33.4 mm burst after cleaning. I would then inspect the temperature sensor's radiation shield, siting and ventilation. Its daytime residual rose to +4.9 °C while night readings stayed within 0.4 °C, and the post was repainted white. I would compare it with a calibrated handheld thermometer in sun and shade. S03 is my second choice because its temperature sensor froze for 80.2 hours and produced four error codes, but S04 has two affected instruments and physical causes that a short visit can inspect directly.
 
-I used a combination of data-quality rules, time-series analysis, station metadata, GPS information, and maintenance records. Based on the available evidence, I assigned one of three actions to each flagged issue:
+## 2. Least certain decision: exclude S07 wind readings
 
-- **Keep:** The reading appears valid, and there is not enough evidence to change or remove it.
-- **Correct:** There is enough evidence to apply a specific correction, such as fixing a timestamp or a consistent measurement offset.
-- **Exclude:** The readings are unreliable, and I could not confidently recover their correct values.
+From 26 March, S07's wind speed was about 0.27 of its previous share of the neighbours' daily median, after an anemometer replacement. This supports a sensor or installation change, and the log confirms the replacement. However, 0.27 is close to 1/3.6, the conversion between metres per second and kilometres per hour; a unit configuration error could allow a specific correction. Local exposure or wind direction could also affect comparisons. I excluded the readings for now rather than assume a correction. The instrument model, logger unit configuration and a comparison against a calibrated handheld anemometer would resolve this.
 
-## 2. Main Issues I Identified
+## 3. Where AI was wrong
 
-### S02 — Pressure Offset
+During development, an AI-generated simple spike rule treated a large single-station wind jump as a fault. Comparing the event with the other stations showed a shared gust, so I changed the check to use peer evidence and retain corroborated storms. An early sunlight rule also flagged nighttime readings across healthy stations. Checking the observed values against solar elevation showed that its threshold was too strict; I adjusted it using the healthy-station data. These iterations taught me to validate suggested rules against the whole network and known normal periods before trusting their flags.
 
-I found that the pressure readings were approximately 6.6 hPa higher than expected after a board replacement. I treated this as a possible sensor offset rather than an actual change in atmospheric pressure.
+## 4. What I would change for 500 stations
 
-I chose the correction approach because the shift appeared consistent. However, this correction should only be applied if the comparison with the surrounding stations and the maintenance information supports it.
+I would keep station discovery automatic, validate each file against a schema, and run independent station checks in parallel. I would replace manual inspection and fixed neighbour lists with a metadata-based spatial index and robust peer groups, while recording evidence, rule version and confidence for every flag. I would remove routine review of every normal row and send ranked exceptions to a dashboard. Human review should remain for ambiguous weather-versus-fault calls, material corrections, and exclusion decisions with operational impact; automatic corrections should require independent evidence and an audit trail.
 
-### S03 — Frozen Temperature Readings
+## 5. Solar-noon estimate for S04, 20 March 2025
 
-The temperature readings from S03 remained unchanged for an unusually long period, approximately 80 hours. I also found four readings containing error codes.
-
-I considered these signs of a possible sensor or logging problem rather than normal weather behaviour. I chose to exclude the unreliable readings instead of assuming that the recorded temperature was correct.
-
-### S04 — Temperature Drift and Rain Gauge Issue
-
-I observed a daytime temperature difference of approximately 4.9°C compared with the expected pattern. I also found evidence that the rain gauge may have been blocked for around 4.5 days.
-
-I considered these two issues separately because a temperature problem does not automatically explain a rainfall problem. I recommended a technician visit to investigate the station, particularly the temperature drift and the rain gauge.
-
-### S05 — Humidity and GPS Metadata
-
-The humidity readings remained above 100% for an extended period, which suggested a possible sensor issue.
-
-I also found that the station's recorded GPS location did not match the expected location. The difference appeared to be caused by two swapped digits in the installation-sheet coordinates.
-
-I treated the humidity problem as a data-quality issue and the location mismatch as a metadata issue. I would verify the original installation records before changing the station coordinates.
-
-### S06 — Logger Clock Error
-
-I found evidence that the S06 logger clock was approximately six hours behind GPS time following a reboot on 24 March.
-
-I treated this as a timestamp problem rather than an actual weather problem. A time correction is appropriate only when the GPS evidence and the surrounding observations support the same time shift.
-
-### S07 — Wind-Speed Change
-
-After an anemometer replacement on 26 March, the wind-speed readings appeared to be approximately 0.27 times the usual level.
-
-I considered a sensor installation or calibration problem as a possible explanation. I did not apply a correction factor because I could not confidently establish the correct factor from the available evidence. I therefore treated the affected readings as unreliable.
-
-### S08 — Missing and Duplicated Records
-
-I found approximately 36 hours of missing readings and a duplicated day's data on 5 April.
-
-I treated the missing period as a data-coverage issue and the duplicated records as a possible logging or data-processing problem. I avoided treating duplicated measurements as independent observations because that could distort the analysis.
-
-## 3. How I Decided What to Flag
-
-I did not rely on a single threshold to identify all problems. I considered several types of evidence:
-
-1. Whether readings were missing, duplicated, frozen, or outside plausible limits.
-2. Whether a measurement changed suddenly or showed an unusual pattern over time.
-3. Whether neighbouring stations showed a similar change.
-4. Whether GPS information and station metadata were consistent.
-5. Whether maintenance events could explain a change in the readings.
-
-I used these checks to distinguish possible equipment or logging problems from genuine changes in weather. When the evidence was not strong enough to support a reliable correction, I preferred not to invent one.
-
-## 4. Limitations and Uncertainty
-
-The data alone cannot always prove why a sensor produced an unusual reading. For example, a sudden change could be caused by a faulty sensor, a maintenance event, or a real environmental change.
-
-Some corrections require confirmation from calibration records, technician notes, or the original installation documentation. I would not treat a suspected cause as confirmed without that evidence.
-
-I also recognise that unusual readings should not automatically be removed. Excluding valid extreme weather events could lead to an incorrect picture of the weather conditions.
-
-## 5. Final Decision
-
-My approach was to prioritise data reliability and explainability. I wanted every flag to have a clear reason and every correction to be supported by evidence.
-
-Where the issue could be corrected confidently, I considered a correction. Where the data could not be trusted or recovered reliably, I preferred exclusion. Where the evidence did not justify either action, I preferred keeping the reading and avoiding unnecessary changes.
-
-The final decisions should be reviewed alongside the generated `flags.csv`, the network health report, the station metadata, and the available maintenance evidence.
+S04 longitude is 105.146° west. The longitude time offset is 105.146 ÷ 15 ≈ 7 h 00 min west of UTC. Around 20 March, the equation of time is about −8 min (apparent solar time runs about 8 min behind mean solar time). So solar noon in UTC is approximately 12:00 + 7:00 + 0:08 = **19:08 UTC**. This is an estimate; longitude and equation-of-time rounding give minute-level precision. Near solar noon, sunlight should be near its daily peak if the sensor and sky conditions allow it. Comparing the recorded curve with this expected timing helps identify a clock offset or sunlight-sensor problem; clouds can lower the peak without indicating a fault.
